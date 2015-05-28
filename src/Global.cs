@@ -61,22 +61,25 @@ namespace Notifications {
 		private const string interface_name = "org.freedesktop.Notifications";
 		private const string object_path = "/org/freedesktop/Notifications";
 
-		private static INotifications dbus_object = null;
+		private static volatile INotifications dbus_object = null;
 		private static object dbus_object_lock = new object ();
 
 		internal static INotifications DBusObject {
 			get {
-				if (dbus_object != null)
-					return dbus_object;
+				if (dbus_object == null) {
+					lock (dbus_object_lock) {
+						if (dbus_object == null) {
+							if (! Bus.Session.NameHasOwner (interface_name)) {
+								Bus.Session.StartServiceByName (interface_name);
+							}
 
-				lock (dbus_object_lock) {
-					if (! Bus.Session.NameHasOwner (interface_name))
-						Bus.Session.StartServiceByName (interface_name);
-
-					dbus_object = Bus.Session.GetObject<INotifications>
-						(interface_name, new ObjectPath (object_path));
-					return dbus_object;
+							dbus_object = Bus.Session.GetObject<INotifications>
+								(interface_name, new ObjectPath (object_path));
+						}
+					}
 				}
+
+				return dbus_object;
 			}
 		}
 
@@ -85,7 +88,7 @@ namespace Notifications {
 				return DBusObject.Capabilities;
 			}
 		}
-		
+
 		public static ServerInformation ServerInformation {
 			get {
 				return DBusObject.ServerInformation;
